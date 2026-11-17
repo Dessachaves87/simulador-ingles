@@ -187,10 +187,11 @@ let rec=null,recActive=false,onText=null;
 function startRec(cb,continuous){
  if(!SR) return;
  stopRec();
- rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=!!continuous;
+ const me=new SR();rec=me;me.lang="en-US";me.interimResults=true;me.continuous=!!continuous;
  let finalText="";
  recActive=true;onText=cb;
- rec.onresult=e=>{
+ me.onresult=e=>{
+  if(rec!==me)return;
   let interim="";
   for(let i=e.resultIndex;i<e.results.length;i++){
    const t=e.results[i][0].transcript;
@@ -198,12 +199,13 @@ function startRec(cb,continuous){
   }
   cb((finalText+interim).trim(),false);
  };
- rec.onerror=e=>{ if(e.error==="not-allowed") alert("Permita o microfone no Chrome."); };
- rec.onend=()=>{
-  if(recActive && continuous){ try{rec.start()}catch(e){} }
+ me.onerror=e=>{ if(e.error==="not-allowed"){recActive=false;setBtn();alert("Permita o microfone no Chrome.");} };
+ me.onend=()=>{
+  if(rec!==me)return;
+  if(recActive && continuous){ try{me.start()}catch(e){} }
   else { recActive=false; cb(finalText.trim(),true); setBtn(); }
  };
- try{rec.start()}catch(e){}
+ try{me.start()}catch(e){}
  setBtn();
 }
 function stopRec(){ recActive=false; if(rec){try{rec.stop()}catch(e){}} }
@@ -216,7 +218,8 @@ function setBtn(){
 function curTab(){return $("p1").hidden?2:1}
 
 /* normalizar e comparar */
-const norm = s => s.toLowerCase().replace(/[^a-z0-9' ]/g," ").split(/\s+/).filter(Boolean);
+const CONTR = {"i'm":"i am","i'd":"i would","i'll":"i will","i've":"i have","don't":"do not","can't":"cannot","won't":"will not","let's":"let us","that's":"that is","what's":"what is","it's":"it is","we're":"we are","we've":"we have","we'll":"we will","you're":"you are","didn't":"did not","doesn't":"does not","isn't":"is not","wouldn't":"would not","couldn't":"could not","shouldn't":"should not"};
+const norm = s => s.toLowerCase().replace(/[’]/g,"'").replace(/[^a-z0-9' ]/g," ").split(/\s+/).filter(Boolean).flatMap(w=>(CONTR[w]||w).split(" "));
 function match(target,spoken){
  const T=norm(target),S=norm(spoken);
  const dp=Array.from({length:T.length+1},()=>Array(S.length+1).fill(0));
@@ -261,6 +264,7 @@ $("speak1").onclick=()=>{
  startRec((txt,final)=>{
   $("heard1").textContent=txt?"Você disse: "+txt:"";
   if(!final) return;
+  if(!txt){$("msg1").textContent="Não ouvi nada. Chegue mais perto do microfone e tente de novo.";return;}
   const r=match(curChunk,txt);
   const words=curChunk.split(/\s+/);
   const T=r.T; let k=0;
