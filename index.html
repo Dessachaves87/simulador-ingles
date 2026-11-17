@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulador de Inglês</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2230;--mute:#667085;--line:#e3e6ec;--brand:#2f6fed;--ok:#1a8f4c;--bad:#d1384a;--okbg:#e4f5ea;--badbg:#fde8eb}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151c;--card:#1b2029;--ink:#e8ebf2;--mute:#9aa3b5;--line:#2b3240;--brand:#6d9bff;--ok:#4cc585;--bad:#ff7a8a;--okbg:#17352a;--badbg:#3b1d24}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,Segoe UI,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.4rem;margin:.2rem 0}
+.sub{color:var(--mute);margin:0 0 16px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{flex:1;padding:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;cursor:pointer;font-size:1rem}
+.tab[aria-selected="true"]{border-color:var(--brand);color:var(--brand);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:1rem}
+.target{font-size:1.35rem;margin:14px 0;line-height:1.6}
+.w{padding:1px 4px;border-radius:6px}
+.w.ok{background:var(--okbg);color:var(--ok)}
+.w.bad{background:var(--badbg);color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.b{padding:10px 16px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font-size:1rem}
+button.b.main{background:var(--brand);color:#fff;border-color:var(--brand)}
+button.b.rec{background:var(--bad);color:#fff;border-color:var(--bad)}
+.score{font-size:2rem;font-weight:700}
+.mute{color:var(--mute);font-size:.92rem}
+.heard{border-left:3px solid var(--line);padding-left:10px;margin:10px 0;min-height:1.5em}
+.chk label{display:block;padding:4px 0}
+.hint{background:var(--bg);border-radius:10px;padding:10px;font-size:.95rem}
+.warn{background:var(--badbg);color:var(--bad);padding:10px;border-radius:10px;display:none}
+.hist{font-size:.9rem;color:var(--mute)}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+<h1>Simulador de Inglês</h1>
+<p class="sub">Fale em voz alta. Use o Chrome e permita o microfone.</p>
+<div id="nosupport" class="warn">Seu navegador não tem reconhecimento de voz. Abra no Google Chrome.</div>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="t1" aria-selected="true">Repetir frases</button>
+  <button class="tab" role="tab" id="t2" aria-selected="false">Entrevista</button>
+</div>
+
+<section id="p1">
+  <div class="card">
+    <label class="mute" for="grp">Grupo</label>
+    <select id="grp"></select>
+    <label class="mute" for="chunk" style="display:block;margin-top:10px">Frase</label>
+    <select id="chunk"></select>
+    <div class="target" id="target"></div>
+    <div class="row">
+      <button class="b" id="listen">Ouvir</button>
+      <button class="b" id="slow">Ouvir devagar</button>
+      <button class="b main" id="speak1">Falar</button>
+      <button class="b" id="next1">Próxima</button>
+    </div>
+    <div class="heard" id="heard1" aria-live="polite"></div>
+    <div class="score" id="score1"></div>
+    <div class="mute" id="msg1"></div>
+  </div>
+</section>
+
+<section id="p2" hidden>
+  <div class="card">
+    <label class="mute" for="q">Pergunta</label>
+    <select id="q"></select>
+    <p class="target" id="qtext" style="font-size:1.2rem"></p>
+    <div class="hint" id="qhint"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="b" id="readq">Ouvir pergunta</button>
+      <button class="b main" id="speak2">Responder</button>
+      <span class="mute" id="timer">00:00</span>
+    </div>
+    <div class="heard" id="heard2" aria-live="polite"></div>
+    <div class="mute" id="stats2"></div>
+  </div>
+  <div class="card chk">
+    <strong>Checklist STAR</strong>
+    <label><input type="checkbox"> Situation: contei o contexto?</label>
+    <label><input type="checkbox"> Task: disse qual era a minha responsabilidade?</label>
+    <label><input type="checkbox"> Action: expliquei o que EU fiz?</label>
+    <label><input type="checkbox"> Result: terminei com o resultado?</label>
+    <p class="mute">Para feedback de verdade, copie a transcrição e cole no chat com o Claude.</p>
+    <button class="b" id="copy">Copiar transcrição</button>
+  </div>
+</section>
+
+<p class="hist" id="hist"></p>
+</main>
+
+<script>
+const GROUPS = {
+ "1. Pitch (Tell me about yourself)": [
+  "I'm Andressa, a senior Salesforce architect.",
+  "I design solutions that connect business needs to the platform.",
+  "I work closely with developers, clients and stakeholders.",
+  "I also lead a Salesforce community for women in tech.",
+  "I'm looking for a role where I can own the architecture end to end.",
+  "I'm interested in this position because it is remote and technical."
+ ],
+ "2. Abrir e fechar a call": [
+  "Can you hear me okay?",
+  "Let's get started.",
+  "Sorry, I missed that. Could you repeat it, please?",
+  "Let me think for a second.",
+  "Let me confirm what I heard.",
+  "Can we agree on the next steps?",
+  "Thanks, everyone. Have a great day."
+ ],
+ "3. Arquitetura": [
+  "The main trade-off here is flexibility versus maintainability.",
+  "I would start with a Flow and use Apex only when we need more control.",
+  "We need to design the data model and the sharing rules first.",
+  "The downside of this approach is technical debt.",
+  "I recommend we integrate through an API, not through a manual upload.",
+  "Let's document this decision so the team can follow it.",
+  "We should test this in a sandbox before the deployment."
+ ],
+ "4. Cliente e conflito": [
+  "What's the priority for you?",
+  "That's a change request, not a bug fix.",
+  "I see your point, but we need to protect the scope.",
+  "I don't want to commit to a date I can't guarantee.",
+  "The main risk is the timeline.",
+  "What I need from you is a decision by Friday.",
+  "I would rather raise the risk early than surprise you later."
+ ]
+};
+const QUESTIONS = [
+ ["Tell me about yourself.","Pitch de 60s: quem você é, o que faz, o que busca. Termine ligando com a vaga."],
+ ["Why are you looking for a new role?","Só positivo: o que você quer construir, nunca crítica ao atual."],
+ ["Why do you want to work with us?","Mostre que pesquisou a empresa e ligue ao que você faz de melhor."],
+ ["Why are you interested in a remote position?","Autonomia, foco, comunicação clara e escrita. Dê um exemplo."],
+ ["Walk me through an architecture decision you defended.","STAR: contexto, opções, trade-off, por que escolheu, resultado."],
+ ["How do you decide between Flow and Apex?","Critérios: complexidade, volume, manutenção, quem mantém depois."],
+ ["How do you design the data model and sharing for a new org?","Objetos, relacionamentos, OWD, papéis, permission sets, volume de dados."],
+ ["How do you approach an integration with an external system?","Requisitos, padrão (API, eventos), erros, segurança, limites, monitoramento."],
+ ["How do you run a solution design session with the business?","Perguntas abertas, priorização, validar o que entendeu, registrar decisões."],
+ ["Describe a conflict with a stakeholder.","STAR: foque em como você ouviu, alinhou e resolveu."],
+ ["How do you handle scope creep?","Registrar, avaliar impacto, change request, decisão do dono do produto."],
+ ["Tell me about a project that didn't go well.","STAR: o que deu errado, sua parte, o que aprendeu e mudou."],
+ ["How do you manage risks and technical debt?","Identificar cedo, registrar, priorizar, comunicar, mitigar."],
+ ["How do you guide developers?","Orientar, revisar, documentar, sem fazer tudo por eles."],
+ ["How do you prepare UAT and a cutover?","Plano, massa de teste, gates, rollback, comunicação."],
+ ["How do you report bad news to executives?","Cedo, com fatos, impacto, opções e o que você precisa deles."],
+ ["Tell me about a time you said no.","STAR: por que, como disse com respeito, qual alternativa ofereceu."],
+ ["What are your strengths and weaknesses?","Pontos fortes com exemplo. Fraqueza real com o que está fazendo."],
+ ["Where do you see yourself in three years?","Crescer em arquitetura e impacto, ligado ao que a vaga oferece."],
+ ["What are your salary expectations?","Dê uma faixa e diga que está aberta a conversar."],
+ ["What is your English level and how are you improving it?","Honesta e positiva: treino diário de fala e escuta."]
+];
+const FILLERS = ["uh","um","hmm","like","you know","so"];
+const $ = id => document.getElementById(id);
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(!SR) $("nosupport").style.display="block";
+
+/* storage seguro */
+const store = {
+ get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},
+ set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+};
+
+/* fala (TTS) */
+function say(text,rate){
+ try{
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang="en-US";u.rate=rate||0.95;
+  speechSynthesis.speak(u);
+ }catch(e){}
+}
+
+/* abas */
+function tab(n){
+ $("p1").hidden=n!==1;$("p2").hidden=n!==2;
+ $("t1").setAttribute("aria-selected",n===1);$("t2").setAttribute("aria-selected",n===2);
+ stopRec();
+}
+$("t1").onclick=()=>tab(1);$("t2").onclick=()=>tab(2);
+
+/* reconhecimento */
+let rec=null,recActive=false,onText=null;
+function startRec(cb,continuous){
+ if(!SR) return;
+ stopRec();
+ rec=new SR();rec.lang="en-US";rec.interimResults=true;rec.continuous=!!continuous;
+ let finalText="";
+ recActive=true;onText=cb;
+ rec.onresult=e=>{
+  let interim="";
+  for(let i=e.resultIndex;i<e.results.length;i++){
+   const t=e.results[i][0].transcript;
+   if(e.results[i].isFinal) finalText+=t+" "; else interim+=t;
+  }
+  cb((finalText+interim).trim(),false);
+ };
+ rec.onerror=e=>{ if(e.error==="not-allowed") alert("Permita o microfone no Chrome."); };
+ rec.onend=()=>{
+  if(recActive && continuous){ try{rec.start()}catch(e){} }
+  else { recActive=false; cb(finalText.trim(),true); setBtn(); }
+ };
+ try{rec.start()}catch(e){}
+ setBtn();
+}
+function stopRec(){ recActive=false; if(rec){try{rec.stop()}catch(e){}} }
+function setBtn(){
+ $("speak1").textContent=recActive&&curTab()===1?"Parar":"Falar";
+ $("speak1").classList.toggle("rec",recActive&&curTab()===1);
+ $("speak2").textContent=recActive&&curTab()===2?"Parar":"Responder";
+ $("speak2").classList.toggle("rec",recActive&&curTab()===2);
+}
+function curTab(){return $("p1").hidden?2:1}
+
+/* normalizar e comparar */
+const norm = s => s.toLowerCase().replace(/[^a-z0-9' ]/g," ").split(/\s+/).filter(Boolean);
+function match(target,spoken){
+ const T=norm(target),S=norm(spoken);
+ const dp=Array.from({length:T.length+1},()=>Array(S.length+1).fill(0));
+ for(let i=1;i<=T.length;i++)for(let j=1;j<=S.length;j++)
+  dp[i][j]=T[i-1]===S[j-1]?dp[i-1][j-1]+1:Math.max(dp[i-1][j],dp[i][j-1]);
+ const ok=Array(T.length).fill(false);
+ let i=T.length,j=S.length;
+ while(i>0&&j>0){
+  if(T[i-1]===S[j-1]){ok[i-1]=true;i--;j--;}
+  else if(dp[i-1][j]>=dp[i][j-1])i--;else j--;
+ }
+ return {T,ok,score:T.length?Math.round(100*ok.filter(Boolean).length/T.length):0};
+}
+
+/* modo 1 */
+let curChunk="";
+function fillGroups(){
+ $("grp").innerHTML=Object.keys(GROUPS).map((g,i)=>`<option value="${i}">${g}</option>`).join("");
+ fillChunks();
+}
+function fillChunks(){
+ const list=Object.values(GROUPS)[+$("grp").value];
+ $("chunk").innerHTML=list.map((c,i)=>`<option value="${i}">${c}</option>`).join("");
+ showChunk();
+}
+function showChunk(){
+ const list=Object.values(GROUPS)[+$("grp").value];
+ curChunk=list[+$("chunk").value];
+ $("target").innerHTML=curChunk.split(/\s+/).map(w=>`<span class="w">${w}</span>`).join(" ");
+ $("heard1").textContent="";$("score1").textContent="";$("msg1").textContent="";
+}
+$("grp").onchange=fillChunks;$("chunk").onchange=showChunk;
+$("listen").onclick=()=>say(curChunk,0.95);
+$("slow").onclick=()=>say(curChunk,0.65);
+$("next1").onclick=()=>{
+ const sel=$("chunk");
+ if(sel.selectedIndex<sel.options.length-1)sel.selectedIndex++;else if($("grp").selectedIndex<$("grp").options.length-1){$("grp").selectedIndex++;fillChunks();return;}
+ showChunk();
+};
+$("speak1").onclick=()=>{
+ if(recActive){stopRec();return;}
+ startRec((txt,final)=>{
+  $("heard1").textContent=txt?"Você disse: "+txt:"";
+  if(!final) return;
+  const r=match(curChunk,txt);
+  const words=curChunk.split(/\s+/);
+  const T=r.T; let k=0;
+  $("target").innerHTML=words.map(w=>{
+   const n=norm(w); if(!n.length) return `<span class="w">${w}</span>`;
+   const good=r.ok[k]; k+=n.length;
+   return `<span class="w ${good?"ok":"bad"}">${w}</span>`;
+  }).join(" ");
+  $("score1").textContent=r.score+"%";
+  $("msg1").textContent=r.score>=85?"Muito bom! Próxima frase.":r.score>=60?"Quase. Ouça devagar e repita as palavras em vermelho.":"Ouça de novo e fale em pedaços menores.";
+  const h=store.get("hist")||{};h[curChunk]=Math.max(h[curChunk]||0,r.score);store.set("hist",h);
+  renderHist();
+ },false);
+};
+
+/* modo 2 */
+let t0=0,timerId=null,lastTranscript="";
+function fillQ(){
+ $("q").innerHTML=QUESTIONS.map((q,i)=>`<option value="${i}">${q[0]}</option>`).join("");
+ showQ();
+}
+function showQ(){
+ const q=QUESTIONS[+$("q").value];
+ $("qtext").textContent=q[0];$("qhint").textContent="Dica: "+q[1];
+ $("heard2").textContent="";$("stats2").textContent="";$("timer").textContent="00:00";
+ document.querySelectorAll(".chk input").forEach(c=>c.checked=false);
+}
+$("q").onchange=showQ;
+$("readq").onclick=()=>say(QUESTIONS[+$("q").value][0],0.95);
+function tick(){
+ const s=Math.floor((Date.now()-t0)/1000);
+ $("timer").textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0");
+}
+$("speak2").onclick=()=>{
+ if(recActive){stopRec();clearInterval(timerId);return;}
+ t0=Date.now();clearInterval(timerId);timerId=setInterval(tick,500);
+ startRec((txt,final)=>{
+  lastTranscript=txt;
+  $("heard2").textContent=txt;
+  const words=norm(txt);
+  const low=" "+words.join(" ")+" ";
+  let f=0;FILLERS.forEach(x=>{const m=low.match(new RegExp(" "+x+" ","g"));if(m)f+=m.length;});
+  const secs=Math.max(1,(Date.now()-t0)/1000);
+  $("stats2").textContent=words.length+" palavras · "+Math.round(words.length/secs*60)+" palavras/min · "+f+" hesitações (uh, um, like, so...)";
+  if(final)clearInterval(timerId);
+ },true);
+};
+$("copy").onclick=()=>{
+ const q=QUESTIONS[+$("q").value][0];
+ const text="Question: "+q+"\nMy answer: "+lastTranscript;
+ try{navigator.clipboard.writeText(text);$("copy").textContent="Copiado!";setTimeout(()=>$("copy").textContent="Copiar transcrição",1500);}catch(e){}
+};
+
+function renderHist(){
+ const h=store.get("hist")||{};
+ const n=Object.keys(h).length;
+ const good=Object.values(h).filter(v=>v>=85).length;
+ $("hist").textContent=n?`Frases treinadas: ${n} · dominadas (85%+): ${good}`:"";
+}
+fillGroups();fillQ();renderHist();
+</script>
+</body>
+</html>
